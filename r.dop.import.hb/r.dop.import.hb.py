@@ -107,10 +107,12 @@ download_dir = None
 rm_dirs = []
 
 WMS = "https://geodienste.bremen.de/wms_dop_lb?"
-LAYER_HB_CIR = "dop10_cir_2025_HB"
-LAYER_HB_RGB = "dop10_2025_HB"
-LAYER_BHV_CIR = "dop10_cir_2025_BHV"
-LAYER_BHV_RGB = "dop10_2025_BHV"
+LAYER_RGB = ["dop10_2025_HB", "dop10_2025_BHV"]
+LAYER_CIR = ["dop10_cir_2025_HB", "dop10_cir_2025_BHV"]
+LOCATIONS = ["HB", "BHV"]
+LAYER_INFO = dict(
+    zip(LAYER_CIR, zip(LOCATIONS, LAYER_RGB, strict=False), strict=False),
+)
 NATIVE_DOP_RES = 0.1
 
 
@@ -218,11 +220,12 @@ def main():
     location = gisenv["LOCATION_NAME"]
 
     # set queue and variables for worker addon
+    used_layers_files = []
+
     try:
         grass.message(
             _(f"Importing {number_tiles} DOPs for HB in parallel..."),
         )
-        # import pdb; pdb.set_trace()
         for tile in tiles_list:
             key = tile
             new_mapset = f"tmp_mapset_rdop_import_tile_{key}_{os.getpid()}"
@@ -232,16 +235,17 @@ def main():
                 item[1].append(
                     f"{raster_name}_{item[0]}@{new_mapset}",
                 )
+            used_layers_file = grass.tempfile(create=False)
+            used_layers_files.append(used_layers_file)
             param = {
                 "tile_key": key,
                 "tile_url": WMS,
-                "layer_name_cir": LAYER_HB_CIR,
-                "layer_name_rgb": LAYER_HB_RGB,
-                # "layer_name_bhv_cir": LAYER_BHV_CIR,
-                # "layer_name_bhv_rgb": LAYER_BHV_RGB,
+                "layer_name_cir": ",".join(LAYER_CIR),
+                "layer_name_rgb": ",".join(LAYER_RGB),
                 "raster_name": raster_name,
                 "orig_region": ORIG_REGION,
                 "new_mapset": new_mapset,
+                "used_layer_file": used_layers_file,
                 "flags": "",
             }
             grass.message(_(f"raster name: {raster_name}"))
@@ -291,12 +295,21 @@ def main():
                 )
 
     if metadata_file:
+        used_cir_layers = set()
+        for f in used_layers_files:
+            p = pathlib.Path(f)
+            if p.exists():
+                for line in p.read_text(encoding="utf-8").splitlines():
+                    if line.strip():
+                        cir_layer, _rgb_layer = line.split(",")
+                        used_cir_layers.add(cir_layer)
+                p.unlink()
         with pathlib.Path(metadata_file).open("w", encoding="utf-8") as f:
-            f.write(f"WMS_HB_RGB:{WMS}|LAYER:{LAYER_HB_RGB}\n")
-            f.write(f"WMS_HB_CIR:{WMS}|LAYER:{LAYER_HB_CIR}\n")
-            f.write(f"WMS_BHV_RGB:{WMS}|LAYER:{LAYER_BHV_RGB}\n")
-            f.write(f"WMS_BHV_CIR:{WMS}|LAYER:{LAYER_BHV_CIR}\n")
-    # import pdb; pdb.set_trace()
+            for cir_layer in sorted(used_cir_layers):
+                loc, rgb_layer = LAYER_INFO[cir_layer]
+                f.write(f"WMS_{loc}_RGB:{WMS}|LAYER:{rgb_layer}\n")
+                f.write(f"WMS_{loc}_CIR:{WMS}|LAYER:{cir_layer}\n")
+
     # create one vrt per band of all imported DOPs
     raster_out = []
     for band, b_list in all_raster.items():

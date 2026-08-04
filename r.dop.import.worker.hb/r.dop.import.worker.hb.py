@@ -83,6 +83,13 @@
 # % description: Name of raster output
 # %end
 
+# %option
+# % key: used_layer_file
+# % type: string
+# % required: no
+# % description: Path to temporary file to write the used CIR/RGB layer names
+# %end
+
 # %flag
 # % key: r
 # % description: Use native DOP resolution
@@ -91,6 +98,7 @@
 
 import atexit
 import sys
+import pathlib
 
 import grass.script as grass
 from grass.pygrass.utils import get_lib_path
@@ -139,8 +147,6 @@ def main():
     # parser options
     tile_key = options["tile_key"]
     tile_url = options["tile_url"]
-    # layer_name_hb_cir = options["layer_name_hb_cir"]
-    # layer_name_hb_rgb = options["layer_name_hb_rgb"]
     layer_name_cir = options["layer_name_cir"]
     layer_name_rgb = options["layer_name_rgb"]
     raster_name = options["raster_name"]
@@ -174,17 +180,77 @@ def main():
         _(f"Started DOP import for key: {tile_key} and URL: {tile_url}"),
     )
 
-    # import DOPs from WMS
-    import_dop_from_wms(
-        f"{tile_key}@{old_mapset}",
-        raster_name,
-        {"cir": tile_url, "rgb": tile_url},
-        resolution_to_import,
-        {"cir": layer_name_cir, "rgb": layer_name_rgb},
-        rm_group,
-        rm_rast,
-        flags["r"],
-    )
+    cir_candidates = layer_name_cir.split(",")
+    rgb_candidates = layer_name_rgb.split(",")
+
+    if len(cir_candidates) != len(rgb_candidates):
+        grass.fatal(
+            "Number of CIR and RGB layer names does not match "
+            f"({len(cir_candidates)} vs {len(rgb_candidates)}).",
+        )
+
+    # add all generated rasters to a list, later used to create vrt
+    raster_name_list = []
+    used_pairs = []
+
+    # iterate through all layers
+    for cir_layer, rgb_layer in zip(
+        cir_candidates,
+        rgb_candidates,
+        strict=False,
+    ):
+        output_raster = f"{raster_name}_{cir_layer}"
+
+        # import DOPs from WMS
+        import_dop_from_wms(
+            f"{tile_key}@{old_mapset}",
+            output_raster,
+            {"cir": tile_url, "rgb": tile_url},
+            resolution_to_import,
+            {"cir": cir_layer, "rgb": rgb_layer},
+            rm_group,
+            rm_rast,
+            flags["r"],
+        )
+        raster_name_info = grass.raster_info(f"{output_raster}.1")
+
+        # test if raster is invalid
+        if (
+            raster_name_info["min"] is not None
+            and raster_name_info["max"] is not None
+        ):
+            raster_name_list.append(output_raster)
+            used_pairs.append((cir_layer, rgb_layer))
+        else:
+            rm_rast.append(f"{output_raster}.{band}" for band in [1, 2, 3, 4])
+
+    # check which WMS links were used for this tile
+    used_layer_file = options.get("used_layer_file")
+    if used_layer_file and used_pairs:
+        with pathlib.Path(used_layer_file).open("w", encoding="utf-8") as f:
+            for cir_layer, rgb_layer in used_pairs:
+                f.write(f"{cir_layer}, {rgb_layer}\n")
+
+    # no valid raster
+    if not raster_name_list:
+        grass.fatal("Unable to find DOP matching the given aoi")
+
+    # one valid raster
+    elif len(raster_name_list) == 1:
+        for band in [1, 2, 3, 4]:
+            grass.run_command(
+                "g.rename",
+                raster=f"{raster_name_list[0]}.{band},{raster_name}.{band}",
+            )
+
+    # multiple valid rasters
+    else:
+        for band in [1, 2, 3, 4]:
+            grass.run_command(
+                "r.patch",
+                input=[f"{r}.{band}" for r in raster_name_list],
+                output=f"{raster_name}.{band}",
+            )
 
     # adjust resolution if required
     if resolution_to_import:
