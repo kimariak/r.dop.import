@@ -98,10 +98,16 @@
 # % description: Use native data resolution
 # %end
 
+# %flag
+# % key: o
+# % description: For local data import: if no matching local data found, try to access via open data portal
+# %end
+
 # %rules
 # % required: federal_state, federal_state_file
 # % excludes: federal_state_file, federal_state
 # % requires_all: -k, download_dir
+# % requires: -o, local_data_dir
 # %end
 
 import atexit
@@ -206,7 +212,15 @@ def main():
 
         # check if local data for federal state given
         imported_local_data = False
-        if fs in local_fs_list:
+        if fs not in local_fs_list and not flags["o"]:
+            grass.fatal(
+                _(
+                    f"Missing federal state folder '{fs}' "
+                    f"within local_data_dir: '{local_data_dir}'. "
+                    "Check local_data_dir or consider using o-flag.",
+                ),
+            )
+        elif fs in local_fs_list:
             all_dops_local = []
             out_fs = f"dop_{fs}_{ID}"
             imported_local_data = import_local_data(
@@ -219,6 +233,7 @@ def main():
                 rm_groups,
                 native_res,
                 ns_res,
+                flags["o"],
             )
             if imported_local_data:
                 for band in ("red", "green", "blue", "nir"):
