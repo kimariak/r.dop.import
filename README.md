@@ -22,7 +22,7 @@ ______________________________________________________________________
 
 ### Overview of the available digital orthophotos
 
-| Federal state | fs |DOP Import Addon | Tile-index | Data Download | Resolution | Data Source |
+| Federal state | fs | DOP Import Addon | Tile-index | Data Download | Resolution | Data Source |
 | - | - | - | - | - | - | - |
 | Baden-Württemberg | BW | &#9745; | (via WMS) | | 20cm | [Open GeoData Portal](https://opengeodata.lgl-bw.de/#/) |
 | Bayern | BY | &#9745; | (via WMS) | | 20cm | [Open GeoData](https://geodaten.bayern.de/opengeodata/) |
@@ -55,5 +55,4 @@ Johannes Halbauer, [mundialis GmbH & Co. KG](https://www.mundialis.de/)
 Anika Weinmann, [mundialis GmbH & Co. KG](https://www.mundialis.de/)  
 Julia Haas, [mundialis GmbH & Co. KG](https://www.mundialis.de/)  
 Lina Krisztian, [mundialis GmbH & Co. KG](https://www.mundialis.de/)  
-Victoria-Leandra Brunn, [mundialis GmbH & Co. KG](https://www.mundialis.de/)  
- 
+Victoria-Leandra Brunn, [mundialis GmbH & Co. KG](https://www.mundialis.de/)
