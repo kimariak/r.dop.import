@@ -208,7 +208,7 @@ def main():
             rm_dirs.append(os.path.join(gisdbase, location, new_mapset))
             b_name = parse_qs(urlparse(tile[1][0]).query)["file"][0]
             raster_name = (
-                f"{Path(b_name).stem.replace('-', '_')}_{os.getpid()}"
+                f"{pathlib.Path(b_name).stem.replace('-', '_')}_{os.getpid()}"
             )
             for item in all_raster.items():
                 item[1].append(
